@@ -6,13 +6,13 @@
 #include <stdint.h>
 
 /* BER inspired protocol :
- * +---+------+------+---//---+---//---+
- * | T | LN   | LV   | NAME   | VALUE  |
- * +---+------+------+---//---+---//---+
+ * +---+--------+--------+---//---+---//---+
+ * | T | LN     | LV     | NAME   | VALUE  |
+ * +---+--------+--------+---//---+---//---+
  * 
  * T     : Type, 3 char
- * LN    : Length of name, base36 encoded
- * LV    : Length of value, base36 encoded
+ * LN    : Length of name, base36 encoded, 8 digit 0 padded
+ * LV    : Length of value, base36 encoded, 8 digit 0 padded
  * NAME  : The name of the entry (utf-8)
  * VALUE : The value of the entry
  * 
@@ -30,7 +30,7 @@
  *
  * Limits
  * ------
- * Name and value can be above 2Gib.
+ * Name and value can be above 2.5Tib.
  * 
  */
 
