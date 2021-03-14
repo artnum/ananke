@@ -71,7 +71,8 @@ void object_free (Object * object);
 Pair * pair_new (char * name, size_t nlen, char * type, char * value, size_t vlen);
 void pair_print (Pair * pair, int level);
 Pair * pair_at(Pair * pair, const char * path);
-void pair_get_value (Pair * pair, void ** value, Type * vtype);
+int pair_get_value (Pair * pair, Type * vtype, void ** value, size_t *vlen);
+int pair_get_value_at (Pair * pair, const char * path, Type * vtype, void ** value, size_t * vlen);
 void pair_free (Pair * pair);
 Pair * proto_parse (Message * msg);
 

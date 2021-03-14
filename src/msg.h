@@ -21,6 +21,7 @@ Message * msg_new ();
 int msg_append (Message * msg, char * content, size_t len);
 void msg_free (Message * msg);
 int msg_stack_push (Message ** stack, Message * msg);
+int msg_printf(Message * msg, const char * format, ...);
 Message * msg_stack_pop (Message ** stack);
 int msg_stack_size(Message * stack);
 

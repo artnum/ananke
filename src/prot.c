@@ -268,6 +268,7 @@ Pair * pair_new (char * name, size_t nlen, char * type, char * value, size_t vle
         new->type = STRING;
         new->sv = calloc(vlen + 1, sizeof(*value));
         if (new->sv == NULL) { free(new); return NULL; }
+        new->length = vlen;
         memcpy(new->sv, value, vlen);
     } else if (strncmp(type, "INT", 3) == 0) {
         new->type = INTEGER;
@@ -347,17 +348,25 @@ void pair_free (Pair * pair) {
     free(pair);
 }
 
+int pair_get_value_at (Pair * pair, const char * path, Type * vtype, void ** value, size_t * vlen) {
+    Pair * current = NULL;
+    current = pair_at(pair, path);
+    if (current) {
+        return pair_get_value(current, vtype, value, vlen);
+    }
+    return 0;
+}
+
 Pair * pair_at(Pair * pair, const char * path) {
     char * sptr = NULL;
     char * str = strdup(path);
-    char * strs = str;
     char * value = NULL;
     Pair * found = NULL;
     size_t i = 0;
-    while ((value = strtok_r(str, ".", &sptr)) != NULL) {
-        printf("VALUE %s\n", value);
+
+    value = strtok_r(str, ".", &sptr);
+    while (value != NULL) {
         found = NULL;
-        str = NULL;
         if (pair->type == OBJECT) {
             for (i = 0; i < pair->ov->count; i++) {
                 if (*(pair->ov->list + i) != NULL && strcmp((*(pair->ov->list + i))->name, value) == 0) {
@@ -367,27 +376,32 @@ Pair * pair_at(Pair * pair, const char * path) {
             }
             if (found) { pair = found; } else { break; }
         }
+        value = strtok_r(NULL, ".", &sptr);
     }
-    free(strs);
+    free(str);
     return found;
 }
 
-void pair_get_value (Pair * pair, void ** value, Type * vtype) {
-    if (value == NULL) { return; }
-    if (vtype == NULL) { return; }
-    *value = NULL;
+int pair_get_value (Pair * pair, Type * vtype, void ** value, size_t * vlen) {
+    if (value == NULL) { return 0; }
+    if (value != NULL) { *value = NULL; }
     *vtype = NONE;
-    if (pair == NULL) { return; }
+    if (vlen != NULL) { *vlen = 0; }
+    if (pair == NULL) { return 0; }
     *vtype = pair->type;
-    switch (pair->type) {
-        case OBJECT: *value = pair->ov; break;
-        case BOOL:
-        case INTEGER: *value = &(pair->iv); break;
-        case BYTESTRING:
-        case STRING: *value = pair->sv; break;
-        case NUL: *value = NULL; break;
-        case FLOAT: *value = &(pair->fv); break;
-    }   
+    if (value != NULL) {
+        switch (pair->type) {
+            case OBJECT: *value = pair->ov; break;
+            case BOOL:
+            case INTEGER: *value = &(pair->iv); break;
+            case BYTESTRING:
+            case STRING: *value = pair->sv; break;
+            case NUL: *value = NULL; break;
+            case FLOAT: *value = &(pair->fv); break;
+        }   
+    }
+    if (vlen != NULL) { *vlen = pair->length; }
+    return 1;
 }
 
 void pair_print (Pair * pair, int level) {

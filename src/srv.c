@@ -1,3 +1,4 @@
+#include "ananke.h"
 #include "lock.h"
 #include "msg.h"
 #include "prot.h"
@@ -8,27 +9,16 @@
 #include <stdio.h>
 #include <unistd.h>
 
-struct session_data {
-    Message * current;
-    Message * instack;
-    Message * outstack;
-    int pingCount;
-    int pongReceived;
-    pthread_mutex_t mutex;
-    pthread_cond_t condition;
-    struct lws *wsi;
-    pthread_t userthread;
-    int end;
-};
-
 void * process_protocol (void * d) {
-    struct session_data * session = (struct session_data *)d;
+    Session * session = (Session *)d;
     Pair * root = NULL;
     Pair * current = NULL;
     Message * msg;
     void * value = NULL;
     Type vtype = NONE;
+    size_t vlen = 0;
     int end = 0;
+    int opret = 0;
     do {
         lwsl_notice("THREAD WAIT\n");
         mcondwait(&(session->condition), &(session->mutex));
@@ -38,21 +28,15 @@ void * process_protocol (void * d) {
         msg = msg_stack_pop(&(session->instack));
         if (msg != NULL) {
             root = proto_parse(msg);
-            current = pair_at(root, "operation");
-            pair_get_value(current, &value, &vtype);
-            if (vtype != STRING) { lwsl_err("Operation must be string\n"); }
-            else {
-                if (strncmp((char *)value, "pong", 4) == 0) {
-                    current = pair_at(root, "count");
-                    if (current == NULL) { lwsl_err("Count argument must be integer\n"); }
-                    else {
-                        pair_get_value(current, &value, &vtype);
-                        if (vtype == INTEGER) {
-                            mlock(&(session->mutex));
-                            session->pongReceived = *((int *)value);
-                            munlock(&(session->mutex));
-                        }
+            if (root) {
+                opret = ananke_operation(root, session);
+                if (opret > 0) {
+                    if (mlock(&(session->mutex))) {
+                        lws_callback_on_writable(session->wsi);
+                        munlock(&(session->mutex));
                     }
+                } else if (opret < 0) {
+                    lwsl_err("Unrecoverable error\n");
                 }
             }
             msg_free(msg);
@@ -65,7 +49,7 @@ void * process_protocol (void * d) {
 }
 
 int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * user, void *in, size_t len) {
-    struct session_data *session = (struct session_data *)user;
+    Session *session = (Session *)user;
     Message * msg = NULL;
     char * body = NULL;
     Pair * message = NULL;
@@ -82,6 +66,7 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             session->pingCount = 0;
             session->pongReceived = 0;
             session->end = 0;
+            session->wsi = wsi;
             msg = msg_new();
             if (!msg) {
                 lwsl_err("Cannot allocate message\n");
@@ -98,6 +83,10 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
         /* ping */
         case LWS_CALLBACK_TIMER:
             session->pingCount++;
+            if (session->end) {
+                lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
+                return 1;
+            }
             if (session->pingCount - session->pongReceived > 10) {
                 session->end = 1;
                 lwsl_notice("Client disconnected\n");
@@ -116,6 +105,7 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             session->end = 1;
             mcondsignal(&(session->condition));
             pthread_join(session->userthread, NULL);
+            lwsl_notice("Thread joined. End is near\n");
             while((msg = msg_stack_pop(&(session->instack))) != NULL) {
                 msg_free(msg);
             }
@@ -172,7 +162,7 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
 }
 
 static struct lws_protocols protocols[] = {
-    {"ananke", ananke_protocol, sizeof(struct session_data), 128, 0, NULL, 0},
+    {"ananke", ananke_protocol, sizeof(Session), 128, 0, NULL, 0},
     {NULL, NULL, 0, 0}
 };
 

@@ -2,6 +2,24 @@
 #define ANANKE_H__
 
 #include <stddef.h>
+#include <libwebsockets.h>
+#include <pthread.h>
+#include "msg.h"
+#include "mutex.h"
+#include "prot.h"
+
+typedef struct _s_session {
+    Message * current;
+    Message * instack;
+    Message * outstack;
+    int pingCount;
+    int pongReceived;
+    pthread_mutex_t mutex;
+    pthread_cond_t condition;
+    struct lws *wsi;
+    pthread_t userthread;
+    int end;
+} Session;
 
 typedef enum _e_anankeOp {
     ANANKE_NOP = -1,
@@ -15,15 +33,17 @@ typedef enum _e_anankeOp {
 struct _s_anankeOpMap {
     AnankeOp operation;
     const char * opstr;
+    const size_t oplen;
 };
 
 static const struct _s_anankeOpMap OperationMap[] = {
-    {ANANKE_PING, "ping"},
-    {ANANKE_PONG, "pong"},
-    {ANANKE_CLOSE, "close"},
-    {ANANKE_LOCK_RESOURCE, "lock-resource"},
-    {ANANKE_UNLOCK_RESOURCE, "unlock-resource"},
+    {ANANKE_PING, "ping", sizeof("ping")},
+    {ANANKE_PONG, "pong", sizeof("pong")},
+    {ANANKE_CLOSE, "close", sizeof("close")},
+    {ANANKE_LOCK_RESOURCE, "lock-resource", sizeof("lock-resource")},
+    {ANANKE_UNLOCK_RESOURCE, "unlock-resource", sizeof("unlock-resource")},
     {ANANKE_NOP, NULL}
 };
 
+int ananke_operation (Pair * root, Session * session);
 #endif /* ANANKE_H__ */
