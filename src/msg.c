@@ -16,8 +16,28 @@ Message * msg_new (AKMsgType type) {
     new->len = 0;
     new->cursor = 0;
     new->next = NULL;
+    new->previous = NULL;
+    new->free = NULL;
     new->nulled = 0;
     new->type = type;
+    return new;
+}
+
+Message * msg_new_pointer (void * ptr, void (*cbfree)(void *)) {
+    Message * new = NULL;
+    new = calloc(1, sizeof(*new));
+    new->body = ptr;
+    new->type = AK_MSG_POINTER;
+    new->len = sizeof(ptr);
+    new->cursor = new->len;
+    new->next = NULL;
+    new->previous = NULL;
+    new->nulled = 0;
+    if (cbfree == NULL) {
+        new->free = free;
+    } else {
+        new->free = cbfree;
+    }
     return new;
 }
 
@@ -88,7 +108,13 @@ int msg_append (Message * msg, char * content, size_t len) {
 
 void msg_free (Message * msg) {
     if (msg) {
-        if (msg->body) { free(msg->body - LWS_PRE); }
+        if (msg->body) { 
+            if (msg->free) {
+                msg->free(msg->body);
+            } else {
+                free(msg->body - LWS_PRE);
+            }
+        }
         free(msg);
     }
 }

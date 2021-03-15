@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-W -Wall `pkg-config --cflags libwebsockets` -ggdb
-LDFLAGS=-lm -lpthread `pkg-config --libs libwebsockets`
+CFLAGS=-W -Wall `pkg-config --cflags libwebsockets uuid` -ggdb
+LDFLAGS=-lm -lpthread `pkg-config --libs libwebsockets uuid`
 EXEC=ananke-srv
 SRC=$(wildcard *.c)
 OBJ=$(SRC:.c=.o)

@@ -72,6 +72,7 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             minit(&(session->mutex));
             msgstack_init(&(session->in));
             msgstack_init(&(session->out));
+            msgstack_init(&(session->requestId));
             mcondinit(&(session->condition));
             pthread_create(&(session->userthread), NULL, process_protocol, session);
             session->pingCount = 0;
@@ -136,6 +137,13 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             i = 0;
             do {
                 while((msg = msgstack_pop(&(session->out), &sterr)) != NULL) {
+                    msg_free(msg);
+                }
+                i++;
+            } while (sterr != AK_STACK_SUCCESS && i < 50);
+            i = 0;
+            do {
+                while((msg = msgstack_pop(&(session->requestId), &sterr)) != NULL) {
                     msg_free(msg);
                 }
                 i++;

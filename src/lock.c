@@ -32,34 +32,39 @@ Lock * lock_create(char * resource, size_t rlen, void * host) {
     new->rlen = rlen;
     new->host = host;
     new->on = 0;
+    uuid_generate(new->id);
     pthread_mutex_init(&(new->mutex), NULL);
 
     return new;
 }
 
-int lock (LockContext * ctx, char * resource, size_t rlen, void * host) {
+char * lock (LockContext * ctx, char * resource, size_t rlen, void * host) {
     Lock * new = NULL;
     Lock * old = NULL;
-    int getTry = 0;
-    int lockId = 0;
+    char * lockId = NULL;
 
     /* get lock, if none can lock else lock is refused */
-    old = lock_get(ctx, resource, rlen, &getTry);
-    if (old) { lock_free(old); return 0; }
-    if (getTry >= LOCK_MAX_TRY) { return 0; }
+    old = lock_get(ctx, resource, rlen, NULL);
+    if (old) { lock_free(old); return NULL; }
+
+    lockId = calloc(37, sizeof(*lockId));
+    if (lockId == NULL) { return NULL; }
 
     new = lock_create(resource, rlen, host);
-    if (new == NULL) { return 0; }
+    if (new == NULL) { free(lockId); return NULL; }
 
-    lockId = lock_insert(ctx, new);
-    if (!lockId) { lock_free(new); return 0; }
+    if (!lock_insert(ctx, new)) { lock_free(new); free(lockId); return NULL; }
+    uuid_unparse(new->id, lockId);
+    
     return lockId;
 }
 
-int unlock (LockContext * ctx, int lockId) {
+int unlock (LockContext * ctx, char * lockId) {
     Lock * old = NULL;
+    uuid_t id;
 
-    old = lock_remove(ctx, lockId);
+    uuid_parse(lockId, id);
+    old = lock_remove(ctx, id);
     if (old) {
         lock_free(old);
         return 1;
@@ -72,6 +77,7 @@ Lock * lock_get (LockContext * ctx, char * resource, size_t rlen, int * count) {
     Lock * found = NULL;
     int skipped = 0;
     Lock * current = NULL;
+    int _count = 0;
 
     pthread_mutex_lock(&(ctx->mutex));
     for (i = 0; i < ctx->size; i++) {
@@ -94,6 +100,7 @@ Lock * lock_get (LockContext * ctx, char * resource, size_t rlen, int * count) {
 
     /* not found but some lock skipped, wait and retry x10 */
     if (!found && skipped > 0) {
+        if (count == NULL) { count = &_count; }
         if (*count < LOCK_MAX_TRY) {
             usleep(50);
             (*count)++;
@@ -104,13 +111,19 @@ Lock * lock_get (LockContext * ctx, char * resource, size_t rlen, int * count) {
     return found;
 }
 
-Lock * lock_remove (LockContext * ctx, int lockId) {
+Lock * lock_remove (LockContext * ctx, uuid_t id) {
     Lock * old = NULL;
+    int i = 0;
 
     pthread_mutex_lock(&(ctx->mutex));
-    if (lockId - 1 < ctx->size) {
-        old = *(ctx->origin + lockId - 1);
-        *(ctx->origin + lockId - 1) = NULL;
+    for (i = 0; i < ctx->size; i++) {
+        if (*(ctx->origin + i) != NULL) {
+            if (uuid_compare(id, (*(ctx->origin + i))->id) == 0) {
+                old = *(ctx->origin + i);
+                *(ctx->origin + i) = NULL;
+                break;
+            }
+        }
     }
     pthread_mutex_unlock(&(ctx->mutex));
 
@@ -126,13 +139,12 @@ int lock_insert (LockContext * ctx, Lock * new) {
         if (*(ctx->origin + i) == NULL) {
             lockId = i + 1;
             *(ctx->origin + i) = new;
-            new->id = lockId;
             break;
         }
     }
     pthread_mutex_unlock(&(ctx->mutex));
 
-    if (lockId != 0) { return new->id; }
+    if (lockId != 0) { return 1; }
     if(!lock_ctx_grow(ctx)) { return 0; }
     return lock_insert(ctx, new);
 }

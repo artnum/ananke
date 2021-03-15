@@ -17,6 +17,7 @@ typedef struct _s_session {
     Message * current;
     MessageStack in;
     MessageStack out;
+    MessageStack requestId;
     int pingCount;
     int pongReceived;
     int end;
@@ -46,8 +47,11 @@ typedef enum _e_anankeErrorCode {
     AK_ERR_UNKNOWN_OP,
     AK_ERR_NOT_ALLOWED,
     AK_ERR_MISSING_ARGUMENT,
-    AK_ERR_WRONG_TYPE
+    AK_ERR_WRONG_TYPE,
+    AK_ERR_MISSING_OPID,
+    AK_ERR_WRONG_OPID_TYPE,
 
+    AK_ERR_SERVER_ERROR = 1000
 } AnankeErrorCode;
 
 struct _s_anankeOpMap {
@@ -84,6 +88,9 @@ static const struct _s_anankeErrorMap EnErrorMap[] = {
     { AK_ERR_NOT_ALLOWED, "Operation not allowed" },
     { AK_ERR_MISSING_ARGUMENT, "Argument missing for operation" },
     { AK_ERR_WRONG_TYPE, "Argument has the wrong type"},
+    { AK_ERR_MISSING_OPID, "Operation identifier is missing"},
+    { AK_ERR_WRONG_OPID_TYPE, "Wrong operation identifier type"},
+    { AK_ERR_SERVER_ERROR, "Generic server error"},
     { AK_ERR_NONE, NULL }
 };
 
@@ -94,6 +101,9 @@ static const struct _s_anankeErrorMap FrErrorMap[] = {
     { AK_ERR_NOT_ALLOWED, "Opération non autoriése" },
     { AK_ERR_MISSING_ARGUMENT, "Argument manquant pour l'opération" },
     { AK_ERR_WRONG_TYPE, "Mauvais type pour l'argument" },
+    { AK_ERR_MISSING_OPID, "L'identifiant d'opération est manquant"},
+    { AK_ERR_WRONG_OPID_TYPE, "Mauvais type pour l'identifiant d'opération"},
+    { AK_ERR_SERVER_ERROR, "Erreur serveur générique"},
     { AK_ERR_NONE, NULL }
 };
 
@@ -103,7 +113,7 @@ static const struct _s_anankeErrorMapLang ErrorMapLocale[] = {
     { NULL, NULL}
 };
 
-void ananke_error (Session * session, AnankeErrorCode code, const char * details);
+void ananke_error (Session * session, AnankeErrorCode code, const char * details, char * clientOpId);
 void ananke_message (Session * session, char * format, ...);
 int ananke_operation (Pair * root, Session * session);
 #endif /* ANANKE_H__ */

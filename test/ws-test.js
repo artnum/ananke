@@ -14,14 +14,17 @@ function sopen(event) {
 
                 break;
             case 'ping':
-                socket.send(enc.encodeObject('', {'operation': 'pong', 'count': json.count}))
+                socket.send(enc.encodeObject('', {'operation': 'pong', 'count': json.count, 'opid': Math.random().toString(16).substr(2, 16)}))
                 break;
         }
     }
 }
 
 function send (event) {
-    const value = enc.encodeObject('', JSON.parse(document.getElementById('send').value))
+    const json = JSON.parse(document.getElementById('send').value)
+    json.opid = Math.random().toString(16).substr(2, 16);
+    const value = enc.encodeObject('', json)
+    
     socket.send(value)
 }
 

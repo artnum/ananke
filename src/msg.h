@@ -14,6 +14,7 @@ struct _s_message {
     size_t len;
     size_t cursor;
     int nulled;
+    void (*free)(void *);
     Message * next;
     Message * previous;
 };
@@ -36,6 +37,7 @@ typedef enum {
 #define msg_length(msg) ((msg)->nulled ? (msg)->len - LWS_SEND_BUFFER_POST_PADDING - 1 : (msg)->len - LWS_SEND_BUFFER_POST_PADDING)
 
 Message * msg_new (AKMsgType type);
+Message * msg_new_pointer (void * ptr, void (*cbfree)(void *));
 int msg_append (Message * msg, char * content, size_t len);
 void msg_free (Message * msg);
 size_t msg_printf(Message * msg, const char * format, ...);
