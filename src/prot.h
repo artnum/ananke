@@ -1,16 +1,16 @@
 #ifndef PROT_H__
 #define PROT_H__
 
-#include "msg.h"
 #include <stddef.h>
 #include <stdint.h>
+#include "msg.h"
 
 /* BER inspired protocol :
  * +---+--------+--------+---//---+---//---+
  * | T | LN     | LV     | NAME   | VALUE  |
  * +---+--------+--------+---//---+---//---+
  * 
- * T     : Type, 3 char
+ * T     : AKType, 3 char
  * LN    : Length of name, base36 encoded, 8 digit 0 padded
  * LV    : Length of value, base36 encoded, 8 digit 0 padded
  * NAME  : The name of the entry (utf-8)
@@ -34,23 +34,12 @@
  * 
  */
 
-typedef enum {
-    AK_ENC_NONE = -1,
-    AK_ENC_BOOL = 1,
-    AK_ENC_NULL,
-    AK_ENC_STRING,
-    AK_ENC_INTEGER,
-    AK_ENC_FLOAT,
-    AK_ENC_BYTESTRING,
-    AK_ENC_OBJECT
-} Type;
-
 typedef struct _s_pair Pair;
 typedef struct _s_object Object;
 
 struct _s_pair {
     char * name;
-    Type type;
+    AKType type;
     size_t length;
     int64_t iv;
     double fv;
@@ -71,8 +60,8 @@ void object_free (Object * object);
 Pair * pair_new (char * name, size_t nlen, char * type, char * value, size_t vlen);
 void pair_print (Pair * pair, int level);
 Pair * pair_at(Pair * pair, const char * path);
-int pair_get_value (Pair * pair, Type * vtype, void ** value, size_t *vlen);
-int pair_get_value_at (Pair * pair, const char * path, Type * vtype, void ** value, size_t * vlen);
+int pair_get_value (Pair * pair, AKType * vtype, void ** value, size_t *vlen);
+int pair_get_value_at (Pair * pair, const char * path, AKType * vtype, void ** value, size_t * vlen);
 void pair_free (Pair * pair);
 Pair * proto_parse (Message * msg);
 

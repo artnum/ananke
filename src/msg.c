@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 
-Message * msg_new () {
+Message * msg_new (AKMsgType type) {
     Message * new = NULL;
 
     new = calloc(1, sizeof(*new));
@@ -17,6 +17,7 @@ Message * msg_new () {
     new->cursor = 0;
     new->next = NULL;
     new->nulled = 0;
+    new->type = type;
     return new;
 }
 
@@ -41,6 +42,10 @@ size_t msg_vprintf(Message * msg, const char * format, va_list ap) {
     size_t len = 0;
     va_list ap2;
 
+    if (msg == NULL) { return 0; }
+    if (msg->type != AK_MSG_STRING) { return 0; }
+    if (format == NULL) { return 0; }
+
     va_copy(ap2, ap);
     if (msg == NULL) { return 0; }
     /* pre-flight */
@@ -59,6 +64,7 @@ size_t msg_printf(Message * msg, const char * format, ...) {
     va_list args;
 
     if (msg == NULL) { return 0; }
+    if (msg->type != AK_MSG_STRING) { return 0; }
     if (format == NULL) { return 0; }
 
     va_start(args, format);
@@ -71,8 +77,12 @@ size_t msg_printf(Message * msg, const char * format, ...) {
 int msg_append (Message * msg, char * content, size_t len) {
     int i = 0;
 
+    if (msg == NULL) { return 0; }
+    if (msg->type != AK_MSG_STRING) { return 0; }
+    if (content == NULL) { return 0; }
+
     if (len == 0) { return 0; }
-    if (!_msg_realloc(msg, len)) { munlock(&(msg->mutex)); return 0; }
+    if (!_msg_realloc(msg, len)) { return 0; }
     memcpy((msg->body + msg->cursor), content, len);
     msg->cursor += len;
     return 1;
@@ -85,39 +95,76 @@ void msg_free (Message * msg) {
     }
 }
 
-/* just lock the stack during manipulation as it is the entry point */
-int msg_stack_push (Message ** stack, Message * msg) {
-    if (stack == NULL) { return 0; }
-    if (msg == NULL) { return 0; }
-    msg->next = *stack;
-    *stack = msg;
+void msgstack_init (MessageStack * stack) {
+    if (stack == NULL) { return; }
+    stack->first = NULL;
+    stack->last = NULL;
+    stack->count = 0;
+    minit(&(stack->mutex));
+}
+
+int msgstack_push (MessageStack * stack, Message * msg, AKStackError * err) {
+    if (stack == NULL) { if (err) { *err = AK_WHY_DO_I_PASS_NULL_STACK_AS_ARGUMENT; } return 0; }
+    if (msg == NULL) { if (err) { *err = AK_WHY_DO_I_PASS_NULL_MESSAGE_ON_STACK_AS_ARGUMENT; }return 0; }
+
+    if (!mlock(&(stack->mutex))) { if (err) { *err = AK_STACK_LOCK; } return 0; }
+    if (stack->first == stack->last) {
+        msg->next = stack->first;
+        msg->previous = NULL;
+        stack->first = msg;
+        if (stack->last == NULL) { stack->last = msg; }
+        else { stack->last->previous = msg; }
+        stack->count++;
+        munlock(&(stack->mutex));
+        if (err) { *err = AK_STACK_SUCCESS; }
+        return 1;
+    }
+
+    msg->next = stack->first;
+    stack->first = msg;
+    stack->count++;
+    munlock(&(stack->mutex));
+    if (err) { *err = AK_STACK_SUCCESS; }
     return 1;
 }
 
-Message * msg_stack_pop (Message ** stack) {
-    Message * current = NULL;
-    Message * previous = NULL;
-    if (stack == NULL) { return NULL; }
-    if (*stack == NULL) { return NULL; }
-    current = *stack;
-    while (current->next != NULL) {
-        previous = current;
-        current = current->next;
-    }
+Message * msgstack_pop (MessageStack * stack, AKStackError * err ) {
+    Message * msg = NULL;
+    if (stack == NULL) { if (err) { *err = AK_WHY_DO_I_PASS_NULL_STACK_AS_ARGUMENT; } return NULL; }
 
-    if (previous) { previous->next = NULL; }
-    if (current == *stack) { *stack = NULL; }
-    /* if current is stack, we have current locked */
-    return current;
+    if (!mlock(&(stack->mutex))) { if(err) { *err = AK_STACK_LOCK; } return NULL; }
+    if (stack->first == stack->last) {
+        msg = stack->first;
+        if (msg == NULL) {
+            /* empty stack is not a failure, it's an empty stack */
+            munlock(&(stack->mutex));
+            if (err) { *err = AK_STACK_SUCCESS; }
+            return msg;
+        }
+        stack->first = NULL;
+        stack->last = NULL;
+        msg->next = NULL;
+        msg->previous = NULL;
+        stack->count--;
+        munlock(&(stack->mutex));
+        if (err) { *err = AK_STACK_SUCCESS; }
+        return msg;
+    }
+    msg = stack->last;
+    msg->previous->next = NULL;
+    stack->last = msg->previous;
+    msg->next = NULL;
+    msg->previous = NULL;
+    munlock(&(stack->mutex));
+    if (err) { *err = AK_STACK_SUCCESS; }
+    return msg;
 }
 
-int msg_stack_size (Message * stack) {
-    Message * current = stack;
+size_t msgstack_count(MessageStack * stack) {
+    size_t size = 0;
     if (stack == NULL) { return 0; }
-    int count = 0;
-    while (current != NULL) {
-        count++;
-        current = current->next;
-    }
-    return count;
+    if (!mlock(&(stack->mutex))) { return 0; }
+    size = stack->count;
+    munlock(&(stack->mutex));
+    return size;
 }

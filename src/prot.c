@@ -348,7 +348,7 @@ void pair_free (Pair * pair) {
     free(pair);
 }
 
-int pair_get_value_at (Pair * pair, const char * path, Type * vtype, void ** value, size_t * vlen) {
+int pair_get_value_at (Pair * pair, const char * path, AKType * vtype, void ** value, size_t * vlen) {
     Pair * current = NULL;
     current = pair_at(pair, path);
     if (current) {
@@ -382,7 +382,7 @@ Pair * pair_at(Pair * pair, const char * path) {
     return found;
 }
 
-int pair_get_value (Pair * pair, Type * vtype, void ** value, size_t * vlen) {
+int pair_get_value (Pair * pair, AKType * vtype, void ** value, size_t * vlen) {
     if (value == NULL) { return 0; }
     if (value != NULL) { *value = NULL; }
     *vtype = AK_ENC_NONE;

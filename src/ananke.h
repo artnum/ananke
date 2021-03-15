@@ -5,6 +5,7 @@
 #include <libwebsockets.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include "typedef.h"
 #include "msg.h"
 #include "mutex.h"
 #include "prot.h"
@@ -14,8 +15,8 @@
 
 typedef struct _s_session {
     Message * current;
-    Message * instack;
-    Message * outstack;
+    MessageStack in;
+    MessageStack out;
     int pingCount;
     int pongReceived;
     int end;
@@ -24,8 +25,6 @@ typedef struct _s_session {
     pthread_t userthread;
     pthread_cond_t condition;
     pthread_mutex_t mutex;
-    pthread_mutex_t mout;
-    pthread_mutex_t min;
     LockContext * lockCtx;
     struct _s_anankeErrorMap *errmap;
 } Session;

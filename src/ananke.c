@@ -2,7 +2,7 @@
 
 /* must be locked before */
 void ananke_error (Session * session, AnankeErrorCode code, char * details) {
-    Message * new = NULL;
+    Message * msg = NULL;
     int i = 0;
     struct _s_anankeErrorMap *errmap = &EnErrorMap;
 
@@ -16,37 +16,46 @@ void ananke_error (Session * session, AnankeErrorCode code, char * details) {
         i++;
     }
 
-    new = msg_new();
-    if (new == NULL) { return; }
-    if (!msg_printf(new, "{\"operation\": \"error\", \"message\": \"%s\", \"code\": %d, \"details\": \"%s\"}", errmap[i].msg, errmap[i].code, details != NULL ? details : "")) { msg_free(new); return; }
-    if (!mlock(&(session->mout))) { msg_free(new); return; }
-    if(!msg_stack_push(&(session->outstack), new)) {
-        msg_free(new);
-        munlock(&(session->mout));
-        return;
+    if ((msg = msg_new(AK_MSG_STRING)) == NULL) { return; }
+    if (!mlock(&(session->mutex))) { free(msg); return; }
+    if (!msg_printf(
+        msg,
+        "{\"operation\": \"error\", \"message\": \"%s\", \"code\": %d, \"details\": \"%s\"}",
+        errmap[i].msg,
+        errmap[i].code, details != NULL ? details : "")) { 
+            munlock(&(session->mutex));
+            msg_free(msg);
+            return; 
+        }
+    munlock(&(session->mutex));
+
+    msgstack_push(&(session->out), msg, NULL);
+
+    if (mlock(&(session->mutex))) {
+        lws_callback_on_writable(session->wsi);
+        munlock(&(session->mutex));
     }
-    munlock(&(session->mout));
-    lws_callback_on_writable(session->wsi);
 }
 
 void ananke_message (Session * session, char * format, ...) {
     va_list args;
-    Message * new = NULL;
+    Message * msg = NULL;
     
     va_start(args, format);
-    new = msg_new();
-    if (new == NULL) { return; }
+    msg = msg_new(AK_MSG_STRING);
+    if (msg == NULL) { return; }
+
     /* session lock happend before msg_printf, session->... might be used as argument */
-    if (!mlock(&(session->mout))) { msg_free(new); return; }
-    if (!msg_vprintf(new, format, args)) { msg_free(new); return; }
-    if (!msg_stack_push(&(session->outstack), new)) {
-        msg_free(new);
-        munlock(&(session->mout));
-        va_end(args);
-        return;
+    if (!mlock(&(session->mutex))) { msg_free(msg); return; }
+    if (!msg_vprintf(msg, format, args)) { munlock(&(session->mutex)); msg_free(msg); return; }
+    munlock(&(session->mutex));
+
+    msgstack_push(&(session->out), msg, NULL);
+    
+    if (mlock(&(session->mutex))) {
+        lws_callback_on_writable(session->wsi);
+        munlock(&(session->mutex));
     }
-    munlock(&(session->mout));
-    lws_callback_on_writable(session->wsi);
     va_end(args);
 }
 
@@ -54,7 +63,7 @@ int ananke_operation (Pair * root, Session * session) {
     char * opname = NULL;
     int i = 0;
     int success = 0;
-    Type vtype;
+    AKType vtype;
     void * value;
     size_t vlen;
     int opid = -1;
@@ -84,9 +93,7 @@ int ananke_operation (Pair * root, Session * session) {
             mcondsignal(&(session->condition));
             return 0;
         case ANANKE_PING:
-            if(!mlock(&(session->mout))) { return -1; }
-            ananke_error(&(session->outstack), AK_ERR_NOT_ALLOWED, NULL);
-            munlock(&(session->mout));
+            ananke_error(session, AK_ERR_NOT_ALLOWED, NULL);
             return 1;
         case ANANKE_PONG:
             if (!pair_get_value_at(root, "count", &vtype, &value, &vlen)) {

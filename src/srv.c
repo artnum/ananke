@@ -17,36 +17,47 @@ void * process_protocol (void * d) {
     Pair * current = NULL;
     Message * msg;
     void * value = NULL;
-    Type vtype = AK_ENC_NONE;
-    size_t vlen = 0;
     int end = 0;
     int opret = 0;
+    int i = 0;
+    size_t vlen = 0;
+    AKStackError sterr = AK_STACK_SUCCESS;
+    AKType vtype = AK_ENC_NONE;
+
     do {
-        if (!mlock(&(session->mutex))) { continue; }
-        lwsl_notice("THREAD WAIT\n");
+        if (!mlock(&(session->mutex))) {
+            i++;
+            if (i > 50) { goto failed_as_hell; }
+            continue; 
+        }
+        i = 0;
+
         mcondwait(&(session->condition), &(session->mutex));
         end = session->end;
         munlock(&(session->mutex));
-        if (!mlock(&(session->min))) { lwsl_err("Instack locked\n"); continue; }
-        msg = msg_stack_pop(&(session->instack));
-        munlock(&(session->min));
-        if (msg != NULL) {
-            root = proto_parse(msg);
-            if (root) {
-                opret = ananke_operation(root, session);
-                if (opret > 0) {
-                    lws_callback_on_writable(session->wsi);
-                } else if (opret < 0) {
-                    lwsl_err("Unrecoverable error\n");
-                }
+
+        msg = msgstack_pop(&(session->in), &sterr);
+        if (sterr == AK_STACK_LOCK) { lwsl_warn("Stack lock stalled(%s:%d)\n", __FILE__, __LINE__); }
+
+        if (msg == NULL) { continue; }
+        root = proto_parse(msg);
+        if (root) {
+            opret = ananke_operation(root, session);
+            if (opret > 0) {
+                lws_callback_on_writable(session->wsi);
+            } else if (opret < 0) {
+                lwsl_err("Unrecoverable error\n");
             }
-            msg_free(msg);
-            pair_free(root);
         }
+        msg_free(msg);
+        pair_free(root);
     } while(end == 0);
 
     pthread_exit(NULL);
     return NULL;
+
+failed_as_hell:
+    lwsl_err("Thread failed to get the session lock for too long\n");
 }
 
 int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * user, void *in, size_t len) {
@@ -55,6 +66,8 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
     char * body = NULL;
     Pair * message = NULL;
     int pingDiff = 0;
+    AKStackError sterr = AK_STACK_SUCCESS;
+    int i = 0;
     switch (reason) {
         default: break;
         case LWS_CALLBACK_PROTOCOL_INIT:
@@ -63,8 +76,8 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
         case LWS_CALLBACK_ESTABLISHED:
             lwsl_notice("New client\n");
             minit(&(session->mutex));
-            minit(&(session->mout));
-            minit(&(session->min));
+            msgstack_init(&(session->in));
+            msgstack_init(&(session->out));
             mcondinit(&(session->condition));
             pthread_create(&(session->userthread), NULL, process_protocol, session);
             session->pingCount = 0;
@@ -74,7 +87,11 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             session->lockCtx = lockCtx;
             session->errmap = &EnErrorMap;
 
-            ananke_message(session, "{\"operation\": \"connection\", \"state\": true, \"ping-inverval\": %d}", AK_PING_INTERVAL);
+            ananke_message(
+                session, 
+                "{\"operation\": \"connection\", \"state\": true, \"ping-inverval\": %d}", 
+                AK_PING_INTERVAL
+                );
             lws_set_timer_usecs(wsi, AK_PING_INTERVAL);
 
             break;
@@ -110,43 +127,37 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             session->end = 1;
             mcondsignal(&(session->condition));
             pthread_join(session->userthread, NULL);
-            lwsl_notice("Thread joined. End is near\n");
-            if(mlock(&(session->min))) {
-                while((msg = msg_stack_pop(&(session->instack))) != NULL) {
+            lwsl_notice("Thread joined. Doing great effort to clean up before death !\n");
+
+            i = 0;
+            do {
+                while((msg = msgstack_pop(&(session->in), &sterr)) != NULL) {
                     msg_free(msg);
                 }
-                munlock(&(session->min));
-            }
-            if(mlock(&(session->mout))) {
-                while((msg = msg_stack_pop(&(session->outstack))) != NULL) {
+                i++;
+            } while (sterr != AK_STACK_SUCCESS && i < 50);
+            i = 0;
+            do {
+                while((msg = msgstack_pop(&(session->out), &sterr)) != NULL) {
                     msg_free(msg);
                 }
-                munlock(&(session->mout));
-            }
+                i++;
+            } while (sterr != AK_STACK_SUCCESS && i < 50);
             break;
         case LWS_CALLBACK_SERVER_WRITEABLE:
-            if (mlock(&(session->mout))) {
-                lwsl_notice("Write\n");
-                msg = msg_stack_pop(&(session->outstack));
-                if (msg) {
-                    lwsl_notice("Message to output\n");
-                    lws_write(wsi, (unsigned char *)msg->body, msg_length(msg) , LWS_WRITE_TEXT);
-                    msg_free(msg);
-                    msg = NULL;
-                    if (msg_stack_size(&(session->outstack)) > 0) {
-                        lwsl_notice("More message pending\n");
-                        lws_callback_on_writable(wsi);
-                    }
+                msg = msgstack_pop(&(session->out), &sterr);
+                if (!msg) { if (sterr == AK_STACK_LOCK) { lws_callback_on_writable(wsi); } break; }
+                lws_write(wsi, (unsigned char *)msg->body, msg_length(msg) , LWS_WRITE_TEXT);
+                msg_free(msg);
+                msg = NULL;
+                if (msgstack_count(&(session->out)) > 0) {
+                    lws_callback_on_writable(wsi);
                 }
-                munlock(&(session->mout));
-            } else {
-                lws_callback_on_writable(wsi);
-            }
             break;
         case LWS_CALLBACK_RECEIVE:
             lwsl_notice("Read\n");
             if (lws_is_first_fragment(wsi)) {
-                msg = msg_new();
+                msg = msg_new(AK_MSG_STRING);
                 if (msg == NULL) {
                     lwsl_err("Cannot allocate new message\n");
                     return 1; 
@@ -170,16 +181,11 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             }
             if (lws_is_final_fragment(wsi)) {
                 session->current = NULL;
-                if (mlock(&(session->min))) {
-                    if (!msg_stack_push(&(session->instack), msg)) {
-                        lwsl_err("Cannot add to stack: DROP\n");
-                        msg_free(msg);
-                        munlock(&(session->min));
-                        return 1;
-                    }
-                    munlock(&(session->min));
-                } else {
+                msgstack_push(&(session->in), msg, &sterr);
+                if (sterr != AK_STACK_SUCCESS) {
+                    lwsl_err("Cannot add to stack: DROP\n");
                     msg_free(msg);
+                    return 1;
                 }
                 mcondsignal(&(session->condition));
             }
