@@ -24,7 +24,7 @@ Lock * lock_create(char * resource, size_t rlen, void * host) {
 
     new = calloc(1, sizeof(*new));
     if (new == NULL) { return NULL; }
-    new->resource = calloc(rlen, sizeof(*resource));
+    new->resource = calloc(rlen + 1, sizeof(*resource));
     if (new->resource == NULL) { lock_free(new); return NULL; }
 
     if (time(&(new->time)) == -1) { lock_free(new); return NULL; }
@@ -56,29 +56,32 @@ int lock (LockContext * ctx, char * resource, size_t rlen, void * host) {
     return lockId;
 }
 
-void unlock (LockContext * ctx, int lockId) {
+int unlock (LockContext * ctx, int lockId) {
     Lock * old = NULL;
 
     old = lock_remove(ctx, lockId);
     if (old) {
         lock_free(old);
+        return 1;
     }
+    return 0;
 }
 
 Lock * lock_get (LockContext * ctx, char * resource, size_t rlen, int * count) {
     int i = 0;
-    int found = 0;
+    Lock * found = NULL;
     int skipped = 0;
     Lock * current = NULL;
 
     pthread_mutex_lock(&(ctx->mutex));
     for (i = 0; i < ctx->size; i++) {
         if (*(ctx->origin + i) != NULL) {
-            current = *ctx->origin;
+            current = *(ctx->origin + i);
             if (pthread_mutex_trylock(&(current->mutex)) != EBUSY) {
+                if (rlen != current->rlen) { pthread_mutex_unlock(&(current->mutex)); continue; }
                 if (strncmp(resource, current->resource, rlen) == 0) {
                     current->on++;
-                    found = 1;
+                    found = current;
                 } 
                 pthread_mutex_unlock(&(current->mutex));
                 if (found) { break; }
@@ -98,7 +101,7 @@ Lock * lock_get (LockContext * ctx, char * resource, size_t rlen, int * count) {
         }
     }
 
-    return current;
+    return found;
 }
 
 Lock * lock_remove (LockContext * ctx, int lockId) {
@@ -122,13 +125,14 @@ int lock_insert (LockContext * ctx, Lock * new) {
     for (i = 0; i < ctx->size; i++) {
         if (*(ctx->origin + i) == NULL) {
             lockId = i + 1;
-            *(ctx->origin + lockId) = new;
+            *(ctx->origin + i) = new;
+            new->id = lockId;
             break;
         }
     }
     pthread_mutex_unlock(&(ctx->mutex));
 
-    if (lockId != 0) { return lockId; }
+    if (lockId != 0) { return new->id; }
     if(!lock_ctx_grow(ctx)) { return 0; }
     return lock_insert(ctx, new);
 }

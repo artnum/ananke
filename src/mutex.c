@@ -16,9 +16,11 @@ int mlock (pthread_mutex_t * m) {
         mret = 0;
         mret = pthread_mutex_trylock(m);
         trycount++;
-        if (mret == EBUSY) { usleep(10); } 
+        if (mret == EBUSY) { usleep(50); } 
     } while (mret != 0 && trycount < 5);
-    if (mret != 0) { return 0; }
+    if (mret != 0) { 
+        return 0; 
+    }
     return 1;
 }
 

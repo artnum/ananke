@@ -7,6 +7,7 @@
 #include "msg.h"
 #include "mutex.h"
 #include "prot.h"
+#include "lock.h"
 
 typedef struct _s_session {
     Message * current;
@@ -14,11 +15,15 @@ typedef struct _s_session {
     Message * outstack;
     int pingCount;
     int pongReceived;
-    pthread_mutex_t mutex;
-    pthread_cond_t condition;
+    int end;
+
     struct lws *wsi;
     pthread_t userthread;
-    int end;
+    pthread_cond_t condition;
+    pthread_mutex_t mutex;
+    pthread_mutex_t mout;
+    pthread_mutex_t min;
+    LockContext * lockCtx;
 } Session;
 
 typedef enum _e_anankeOp {

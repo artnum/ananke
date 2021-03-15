@@ -7,7 +7,7 @@ function sopen(event) {
     }
     socket.onmessage = function (event) {
         console.log(event)
-        document.getElementById('received').value = event.data
+        document.getElementById('received').value += event.data + "\n"
         let json = JSON.parse(event.data)
         switch(json.operation) {
             case 'connected':

@@ -13,6 +13,7 @@ typedef struct _s_lock {
     char * resource;
     void * host;
     int on;
+    int id;
     pthread_mutex_t mutex;
 } Lock;
 
@@ -25,7 +26,7 @@ typedef struct _s_lockCtx {
 void lock_free(Lock * l);
 Lock * lock_create(char * resource, size_t rlen, void * host);
 int lock (LockContext * ctx, char * resource, size_t rlen, void * host);
-void unlock (LockContext * ctx, int lockId);
+int unlock (LockContext * ctx, int lockId);
 Lock * lock_get (LockContext * ctx, char * resource, size_t rlen, int * count);
 Lock * lock_remove (LockContext * ctx, int lockId);
 int lock_insert (LockContext * ctx, Lock * new);
