@@ -1,10 +1,10 @@
 #include "ananke.h"
 
 /* must be locked before */
-void ananke_error (Session * session, AnankeErrorCode code, char * details) {
+void ananke_error (Session * session, AnankeErrorCode code, const char * details) {
     Message * msg = NULL;
     int i = 0;
-    struct _s_anankeErrorMap *errmap = &EnErrorMap;
+    struct _s_anankeErrorMap *errmap = (struct _s_anankeErrorMap *)&EnErrorMap;
 
     if (mlock(&(session->mutex))) {
         errmap = session->errmap;
@@ -60,14 +60,13 @@ void ananke_message (Session * session, char * format, ...) {
 }
 
 int ananke_operation (Pair * root, Session * session) {
-    char * opname = NULL;
     int i = 0;
     int success = 0;
     AKType vtype;
     void * value;
     size_t vlen;
     int opid = -1;
-    Message * msg = NULL;
+
     if (root == NULL) { return -1; }
 
     while (OperationMap[i].operation != ANANKE_NOP) {
@@ -86,6 +85,8 @@ int ananke_operation (Pair * root, Session * session) {
         return 1;
     }
     switch (OperationMap[opid].operation) {
+        default:
+        case ANANKE_NOP: break;
         case ANANKE_CLOSE:
             if (!mlock(&(session->mutex))) { return -1; }
             session->end = 1;
@@ -147,7 +148,7 @@ int ananke_operation (Pair * root, Session * session) {
             while (ErrorMapLocale[i].lang != NULL) {
                 if (strncmp(ErrorMapLocale[i].lang, (char *)value, vlen) == 0) {
                     if (mlock(&(session->mutex))) {
-                        session->errmap = ErrorMapLocale[i].errmap;
+                        session->errmap = (struct _s_anankeErrorMap *)ErrorMapLocale[i].errmap;
                         munlock(&(session->mutex));
                         success = 1;
                         break;
@@ -162,4 +163,5 @@ int ananke_operation (Pair * root, Session * session) {
             }
             return 1;
     }
+    return 0;
 }

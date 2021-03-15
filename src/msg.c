@@ -49,10 +49,10 @@ size_t msg_vprintf(Message * msg, const char * format, va_list ap) {
     va_copy(ap2, ap);
     if (msg == NULL) { return 0; }
     /* pre-flight */
-    len = vsnprintf(NULL, 0, format, ap) + 1;
+    len = (size_t)vsnprintf(NULL, 0, format, ap) + 1;
     if (len == 0) { return 0; }
     if (!_msg_realloc(msg, len)) { return 0; }
-    if (len != vsnprintf(msg->body + msg->cursor, len, format, ap2) + 1) { return 0; }
+    if (len != (size_t)vsnprintf(msg->body + msg->cursor, len, format, ap2) + 1) { return 0; }
     msg->cursor += len;
     msg->nulled = 1;
 
@@ -75,8 +75,6 @@ size_t msg_printf(Message * msg, const char * format, ...) {
 
 /* keep space for lws padding, msg->body is set at then end of pre-padding */
 int msg_append (Message * msg, char * content, size_t len) {
-    int i = 0;
-
     if (msg == NULL) { return 0; }
     if (msg->type != AK_MSG_STRING) { return 0; }
     if (content == NULL) { return 0; }

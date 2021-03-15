@@ -368,7 +368,7 @@ Pair * pair_at(Pair * pair, const char * path) {
     while (value != NULL) {
         found = NULL;
         if (pair->type == AK_ENC_OBJECT) {
-            for (i = 0; i < pair->ov->count; i++) {
+            for (i = 0; i < (size_t)pair->ov->count; i++) {
                 if (*(pair->ov->list + i) != NULL && strcmp((*(pair->ov->list + i))->name, value) == 0) {
                     found = *(pair->ov->list + i);
                     break;
@@ -391,6 +391,8 @@ int pair_get_value (Pair * pair, AKType * vtype, void ** value, size_t * vlen) {
     *vtype = pair->type;
     if (value != NULL) {
         switch (pair->type) {
+            default:
+            case AK_ENC_NONE: break;
             case AK_ENC_OBJECT: *value = pair->ov; break;
             case AK_ENC_BOOL:
             case AK_ENC_INTEGER: *value = &(pair->iv); break;
@@ -407,12 +409,14 @@ int pair_get_value (Pair * pair, AKType * vtype, void ** value, size_t * vlen) {
 void pair_print (Pair * pair, int level) {
     size_t i = 0;
     if (pair == NULL) { return; }
-    for (i = 0; i < level * 3; i++) { printf(" "); }
+    for (i = 0; i < (size_t)level * 3; i++) { printf(" "); }
     printf("%s:", pair->name);
     if (pair->type == AK_ENC_OBJECT) {
         object_print(pair->ov, ++level);
     } else {
         switch(pair->type) {
+            default:
+            case AK_ENC_NONE: printf("(none!)"); break;
             case AK_ENC_INTEGER: printf("(int)<%ld>", pair->iv); break;
             case AK_ENC_BOOL: printf(pair->iv ? "(bool)<true>" : "(bool)<false>"); break;
             case AK_ENC_FLOAT: printf("(float)<%f>", pair->fv); break;

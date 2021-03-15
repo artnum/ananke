@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <pthread.h>
 #include "typedef.h"
+#include "mutex.h"
 
 typedef struct _s_message Message;
 struct _s_message {
@@ -21,7 +22,7 @@ typedef struct _s_message_stack {
     Message * first;
     Message * last;
     size_t count;
-    pthread_mutex_t mutex;
+    AKMutex mutex;
 } MessageStack;
 
 typedef enum {

@@ -2,13 +2,13 @@
 #include <unistd.h>
 #include <errno.h>
 
-int minit (pthread_mutex_t * m) {
+int minit (AKMutex * m) {
     if (m == NULL) { return 0; }
     pthread_mutex_init(m, NULL);
     return 1;
 }
 
-int mlock (pthread_mutex_t * m) {
+int mlock (AKMutex * m) {
     int mret = 0;
     int trycount = 0;
     if (m == NULL) { return 0; }
@@ -24,7 +24,7 @@ int mlock (pthread_mutex_t * m) {
     return 1;
 }
 
-int munlock (pthread_mutex_t * m) {
+int munlock (AKMutex * m) {
     int mret = 0;
     if (m == NULL) { return 0; }
     mret = pthread_mutex_unlock(m);
@@ -33,25 +33,30 @@ int munlock (pthread_mutex_t * m) {
 }
 
 /* destroy a locked mutex */
-void mdestroy (pthread_mutex_t * m) {
+void mdestroy (AKMutex * m) {
     if (m == NULL) { return; }
     pthread_mutex_unlock(m);
     pthread_mutex_destroy(m);
 }
 
-void mcondinit (pthread_cond_t * c) {
+void mcondinit (AKCond * c) {
     if (c == NULL) { return; }
     pthread_cond_init(c, NULL);
     return;
 }
 
-void mcondwait (pthread_cond_t * c, pthread_mutex_t * m) {
+void mcondwait (AKCond * c, AKMutex * m) {
     if (c == NULL) { return; }
     if (m == NULL) { return; }
     pthread_cond_wait(c, m);
 }
 
-void mcondsignal(pthread_cond_t * c) {
+void mcondsignal(AKCond * c) {
     if (c == NULL) { return ; }
     pthread_cond_signal(c);
+}
+
+void mconddestroy(AKCond * c) {
+    if (c == NULL) { return; }
+    pthread_cond_destroy(c);
 }

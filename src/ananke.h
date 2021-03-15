@@ -23,8 +23,8 @@ typedef struct _s_session {
 
     struct lws *wsi;
     pthread_t userthread;
-    pthread_cond_t condition;
-    pthread_mutex_t mutex;
+    AKCond condition;
+    AKMutex mutex;
     LockContext * lockCtx;
     struct _s_anankeErrorMap *errmap;
 } Session;
@@ -74,7 +74,7 @@ static const struct _s_anankeOpMap OperationMap[] = {
     {ANANKE_UNLOCK_RESOURCE, "unlock-resource", sizeof("unlock-resource")},
     /* error code are sent translated (if available) after that command */
     {ANANKE_SET_LOCALE, "set-locale", sizeof("set-locale")},
-    {ANANKE_NOP, NULL}
+    {ANANKE_NOP, NULL, 0}
 };
 
 static const struct _s_anankeErrorMap EnErrorMap[] = {
@@ -98,12 +98,12 @@ static const struct _s_anankeErrorMap FrErrorMap[] = {
 };
 
 static const struct _s_anankeErrorMapLang ErrorMapLocale[] = {
-    { "en", &EnErrorMap },
-    { "fr", &FrErrorMap },
+    { "en", (struct _s_anankeErrorMap *)&EnErrorMap },
+    { "fr", (struct _s_anankeErrorMap *)&FrErrorMap },
     { NULL, NULL}
 };
 
-void ananke_error (Session * session, AnankeErrorCode code, char * details);
+void ananke_error (Session * session, AnankeErrorCode code, const char * details);
 void ananke_message (Session * session, char * format, ...);
 int ananke_operation (Pair * root, Session * session);
 #endif /* ANANKE_H__ */

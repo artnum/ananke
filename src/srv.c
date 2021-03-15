@@ -14,15 +14,11 @@ LockContext * lockCtx = NULL;
 void * process_protocol (void * d) {
     Session * session = (Session *)d;
     Pair * root = NULL;
-    Pair * current = NULL;
     Message * msg;
-    void * value = NULL;
+    AKStackError sterr = AK_STACK_SUCCESS;
     int end = 0;
     int opret = 0;
     int i = 0;
-    size_t vlen = 0;
-    AKStackError sterr = AK_STACK_SUCCESS;
-    AKType vtype = AK_ENC_NONE;
 
     do {
         if (!mlock(&(session->mutex))) {
@@ -58,23 +54,21 @@ void * process_protocol (void * d) {
 
 failed_as_hell:
     lwsl_err("Thread failed to get the session lock for too long\n");
+    return NULL;
 }
 
 int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * user, void *in, size_t len) {
     Session *session = (Session *)user;
     Message * msg = NULL;
-    char * body = NULL;
-    Pair * message = NULL;
-    int pingDiff = 0;
     AKStackError sterr = AK_STACK_SUCCESS;
+    int pingDiff = 0;
     int i = 0;
+
     switch (reason) {
         default: break;
         case LWS_CALLBACK_PROTOCOL_INIT:
-            lwsl_notice("Setup\n");
             break;
         case LWS_CALLBACK_ESTABLISHED:
-            lwsl_notice("New client\n");
             minit(&(session->mutex));
             msgstack_init(&(session->in));
             msgstack_init(&(session->out));
@@ -85,19 +79,21 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             session->end = 0;
             session->wsi = wsi;
             session->lockCtx = lockCtx;
-            session->errmap = &EnErrorMap;
+            session->errmap = (struct _s_anankeErrorMap *)&EnErrorMap;
 
+            /* a message to state the obvious */
             ananke_message(
                 session, 
                 "{\"operation\": \"connection\", \"state\": true, \"ping-inverval\": %d}", 
                 AK_PING_INTERVAL
                 );
+            
+            /* timer for ping-pong */
             lws_set_timer_usecs(wsi, AK_PING_INTERVAL);
 
             break;
         /* ping */
         case LWS_CALLBACK_TIMER:
-            lwsl_notice("Timer\n");
             if (mlock(&(session->mutex))) {
                 session->pingCount++;
                 pingDiff = session->pingCount - session->pongReceived;
@@ -127,6 +123,7 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             session->end = 1;
             mcondsignal(&(session->condition));
             pthread_join(session->userthread, NULL);
+            mconddestroy(&(session->condition));
             lwsl_notice("Thread joined. Doing great effort to clean up before death !\n");
 
             i = 0;
@@ -155,7 +152,6 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
                 }
             break;
         case LWS_CALLBACK_RECEIVE:
-            lwsl_notice("Read\n");
             if (lws_is_first_fragment(wsi)) {
                 msg = msg_new(AK_MSG_STRING);
                 if (msg == NULL) {
@@ -196,7 +192,7 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
 
 static struct lws_protocols protocols[] = {
     {"ananke", ananke_protocol, sizeof(Session), 128, 0, NULL, 0},
-    {NULL, NULL, 0, 0}
+    {NULL, NULL, 0, 0, 0, NULL, 0}
 };
 
 static const struct lws_protocol_vhost_options pvo = {

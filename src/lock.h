@@ -3,6 +3,7 @@
 
 #include <time.h>
 #include <pthread.h>
+#include "mutex.h"
 
 #define LOCK_CTX_BLOCK_SIZE 100
 #define LOCK_MAX_TRY 10
@@ -14,13 +15,13 @@ typedef struct _s_lock {
     void * host;
     int on;
     int id;
-    pthread_mutex_t mutex;
+    AKMutex mutex;
 } Lock;
 
 typedef struct _s_lockCtx {
     Lock ** origin;
     int size;
-    pthread_mutex_t mutex;
+    AKMutex mutex;
 } LockContext;
 
 void lock_free(Lock * l);
