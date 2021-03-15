@@ -24,7 +24,7 @@ int ananke_operation (Pair * root, Session * session) {
 
     while (OperationMap[i].operation != ANANKE_NOP) {
         if (pair_get_value_at(root, "operation", &vtype, &value, &vlen)) {
-            if (vtype != STRING) { i++; continue; }
+            if (vtype != AK_ENC_STRING) { i++; continue; }
             if (vlen != OperationMap[i].oplen - 1) { i++; continue; }
             if (strncmp((char *)value, OperationMap[i].opstr, vlen) != 0) { i++; continue; }
             opid = i;
@@ -44,6 +44,7 @@ int ananke_operation (Pair * root, Session * session) {
             if (!mlock(&(session->mutex))) { return -1; }
             session->end = 1;
             munlock(&(session->mutex));
+            mcondsignal(&(session->condition));
             return 0;
         case ANANKE_PING:
             if(!mlock(&(session->mout))) { return -1; }
@@ -57,7 +58,7 @@ int ananke_operation (Pair * root, Session * session) {
                 munlock(&(session->mout));
                 return 1;
             }
-            if (vtype != INTEGER) {
+            if (vtype != AK_ENC_INTEGER) {
                 if (!mlock(&(session->mout))) { return -1; }
                 ananke_error(&(session->outstack), "Wrong argument type, count must be int");
                 munlock(&(session->mout));
@@ -74,7 +75,7 @@ int ananke_operation (Pair * root, Session * session) {
                 munlock(&(session->mout));
                 return 1;
             }
-            if (vtype != STRING) {
+            if (vtype != AK_ENC_STRING) {
                 if (!mlock(&(session->mout))) { return -1; }
                 ananke_error(&(session->outstack), "Resource argument must be string");
                 munlock(&(session->mout));
@@ -94,7 +95,7 @@ int ananke_operation (Pair * root, Session * session) {
                 munlock(&(session->mout));
                 return 1;
             }
-            if (vtype != INTEGER) {
+            if (vtype != AK_ENC_INTEGER) {
                 if (!mlock(&(session->mout))) { return -1; }
                 ananke_error(&(session->outstack), "lockid must be integer\n");
                 munlock(&(session->mout));

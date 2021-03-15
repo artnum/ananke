@@ -35,14 +35,14 @@
  */
 
 typedef enum {
-    NONE = -1,
-    BOOL = 1,
-    NUL,
-    STRING,
-    INTEGER,
-    FLOAT,
-    BYTESTRING,
-    OBJECT
+    AK_ENC_NONE = -1,
+    AK_ENC_BOOL = 1,
+    AK_ENC_NULL,
+    AK_ENC_STRING,
+    AK_ENC_INTEGER,
+    AK_ENC_FLOAT,
+    AK_ENC_BYTESTRING,
+    AK_ENC_OBJECT
 } Type;
 
 typedef struct _s_pair Pair;

@@ -17,7 +17,7 @@ void * process_protocol (void * d) {
     Pair * current = NULL;
     Message * msg;
     void * value = NULL;
-    Type vtype = NONE;
+    Type vtype = AK_ENC_NONE;
     size_t vlen = 0;
     int end = 0;
     int opret = 0;

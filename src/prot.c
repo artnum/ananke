@@ -265,33 +265,33 @@ Pair * pair_new (char * name, size_t nlen, char * type, char * value, size_t vle
     }
     
     if (strncmp(type, "STR", 3) == 0) {
-        new->type = STRING;
+        new->type = AK_ENC_STRING;
         new->sv = calloc(vlen + 1, sizeof(*value));
         if (new->sv == NULL) { free(new); return NULL; }
         new->length = vlen;
         memcpy(new->sv, value, vlen);
     } else if (strncmp(type, "INT", 3) == 0) {
-        new->type = INTEGER;
+        new->type = AK_ENC_INTEGER;
         new->iv = toInt(value, vlen, &error);
         if (error) { free(new); return NULL; }
     } else if (strncmp(type, "FLO", 3) == 0) {
-        new->type = FLOAT;
+        new->type = AK_ENC_FLOAT;
         new->fv = toFloat(value, vlen, &error);
         if (error) { free(new); return NULL; }
     } else if (strncmp(type, "BOO", 3) == 0) {
-        new->type = BOOL;
+        new->type = AK_ENC_BOOL;
         new->iv = toInt(value, 1, &error);
         if (error) { free(new); return NULL; }
     } else if (strncmp(type, "NUL", 3) == 0) {
-        new->type = NUL;
+        new->type = AK_ENC_NULL;
     } else if (strncmp(type, "BST", 3) == 0) {
-        new->type = BYTESTRING;
+        new->type = AK_ENC_BYTESTRING;
         new->sv = calloc(vlen, sizeof(*value));
         if (new->sv == NULL) { free(new); return NULL; }
         new->length = vlen;
         memcpy(new->sv, value, vlen);
     } else if (strncmp(type, "HEX", 3) == 0) {
-        new->type = BYTESTRING;
+        new->type = AK_ENC_BYTESTRING;
         vlen = vlen % 2 != 0 ? vlen + 1 : vlen;
         new->length = vlen / 2;
         new->sv = calloc (new->length, sizeof(*value));
@@ -320,7 +320,7 @@ Pair * pair_new (char * name, size_t nlen, char * type, char * value, size_t vle
             *(new->sv + j) += hex;
         }
     } else if (strncmp(type, "OBJ", 3) == 0) {
-        new->type = OBJECT;
+        new->type = AK_ENC_OBJECT;
         new->ov = object_new();
         if (new->ov == NULL) { free(new); return NULL; }
     }
@@ -340,7 +340,7 @@ void pair_set_name (Pair * pair, const char * name) {
 
 void pair_free (Pair * pair) {
     if (pair == NULL) { return; }
-    if (pair->type == OBJECT) {
+    if (pair->type == AK_ENC_OBJECT) {
         object_free(pair->ov);
     }
     if (pair->name != NULL) { free(pair->name); }
@@ -367,7 +367,7 @@ Pair * pair_at(Pair * pair, const char * path) {
     value = strtok_r(str, ".", &sptr);
     while (value != NULL) {
         found = NULL;
-        if (pair->type == OBJECT) {
+        if (pair->type == AK_ENC_OBJECT) {
             for (i = 0; i < pair->ov->count; i++) {
                 if (*(pair->ov->list + i) != NULL && strcmp((*(pair->ov->list + i))->name, value) == 0) {
                     found = *(pair->ov->list + i);
@@ -385,19 +385,19 @@ Pair * pair_at(Pair * pair, const char * path) {
 int pair_get_value (Pair * pair, Type * vtype, void ** value, size_t * vlen) {
     if (value == NULL) { return 0; }
     if (value != NULL) { *value = NULL; }
-    *vtype = NONE;
+    *vtype = AK_ENC_NONE;
     if (vlen != NULL) { *vlen = 0; }
     if (pair == NULL) { return 0; }
     *vtype = pair->type;
     if (value != NULL) {
         switch (pair->type) {
-            case OBJECT: *value = pair->ov; break;
-            case BOOL:
-            case INTEGER: *value = &(pair->iv); break;
-            case BYTESTRING:
-            case STRING: *value = pair->sv; break;
-            case NUL: *value = NULL; break;
-            case FLOAT: *value = &(pair->fv); break;
+            case AK_ENC_OBJECT: *value = pair->ov; break;
+            case AK_ENC_BOOL:
+            case AK_ENC_INTEGER: *value = &(pair->iv); break;
+            case AK_ENC_BYTESTRING:
+            case AK_ENC_STRING: *value = pair->sv; break;
+            case AK_ENC_NULL: *value = NULL; break;
+            case AK_ENC_FLOAT: *value = &(pair->fv); break;
         }   
     }
     if (vlen != NULL) { *vlen = pair->length; }
@@ -409,16 +409,16 @@ void pair_print (Pair * pair, int level) {
     if (pair == NULL) { return; }
     for (i = 0; i < level * 3; i++) { printf(" "); }
     printf("%s:", pair->name);
-    if (pair->type == OBJECT) {
+    if (pair->type == AK_ENC_OBJECT) {
         object_print(pair->ov, ++level);
     } else {
         switch(pair->type) {
-            case INTEGER: printf("(int)<%ld>", pair->iv); break;
-            case BOOL: printf(pair->iv ? "(bool)<true>" : "(bool)<false>"); break;
-            case FLOAT: printf("(float)<%f>", pair->fv); break;
-            case STRING: printf("(string)<%s>", pair->sv); break;
-            case NUL: printf("(null)"); break;
-            case BYTESTRING:
+            case AK_ENC_INTEGER: printf("(int)<%ld>", pair->iv); break;
+            case AK_ENC_BOOL: printf(pair->iv ? "(bool)<true>" : "(bool)<false>"); break;
+            case AK_ENC_FLOAT: printf("(float)<%f>", pair->fv); break;
+            case AK_ENC_STRING: printf("(string)<%s>", pair->sv); break;
+            case AK_ENC_NULL: printf("(null)"); break;
+            case AK_ENC_BYTESTRING:
                 printf("(bytestring)<");
                 for (i = 0; i < pair->length; i++) {
                     printf("%x", *(pair->sv + i));
@@ -460,10 +460,10 @@ Pair * proto_parse (Message * msg) {
         if (tmp == NULL) {
             break;
         }
-        if (tmp->type != OBJECT) {
+        if (tmp->type != AK_ENC_OBJECT) {
             pair_print(tmp, 0);
         }
-        if (i == 0 && tmp->type != OBJECT) {
+        if (i == 0 && tmp->type != AK_ENC_OBJECT) {
             current = pair_new("", 0, "OBJ", "", 0);
             if (current == NULL) {
                 break;
@@ -476,13 +476,13 @@ Pair * proto_parse (Message * msg) {
             }
             root = current;
         } else {
-            if (tmp->type == OBJECT) {
+            if (tmp->type == AK_ENC_OBJECT) {
                 tmp->ov->parent = current;
             }
             object_add_pair(current->ov, tmp);       
         }
 
-        if (tmp->type == OBJECT) {
+        if (tmp->type == AK_ENC_OBJECT) {
             i += O_CONTENT + lname;
             tmp->ov->end = i + lval;
             current = tmp;
