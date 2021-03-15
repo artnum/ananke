@@ -2,9 +2,9 @@
 
 websocket server mainly develop to test some ideas. The name is from the greek deity of inevitability, compulsion and necessity (the name is in french : Ananké |a.nan.ke|). The developpment sparked from locking and synchronization problems so the project might end up doing just that.
 
-## AKEncoding and Ananke-protocol
+## AKEncoding and Ananké-protocol
 
-On the Web, JSON or XML are nice to send data to the browser. But on the server side it might be a good idea to have some other format for serializing data. The Ananke-protocol is an experiment in an asymetric encoding for a protocol.
+On the Web, JSON or XML are nice to send data to the browser. But on the server side it might be a good idea to have some other format for serializing data. The Ananké-protocol is an experiment in an asymetric encoding for a protocol.
 
 On the sending side, server -> client, JSON is used. Nothing interesting here.
 
@@ -23,6 +23,10 @@ On the receiving side, server <- client, AKEncoding is used. AKEncoding serializ
 
 The structure of AKEncoding allows to go through without first parsing it (which has not been done here but it could be done) and it's streamable.
 Basically the client encode everything it sends into AKEncoding and the server encode everything it sends into JSON.
+
+## i18n
+
+As it's been developp in a country with several official language, the first question that comes out when presenting a software is "is it tranlated to german, french or italian" ? So from the beginning the project added the possibility to have error message in several language. It's a bit rough yet as I have no strategy for that now, but trying some ideas around that is part of the project.
 
 ## Licence
 
