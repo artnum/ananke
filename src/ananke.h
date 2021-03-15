@@ -35,10 +35,25 @@ typedef enum _e_anankeOp {
     ANANKE_UNLOCK_RESOURCE
 } AnankeOp;
 
+typedef enum _e_anankeErrorCode {
+    AK_ERR_NONE = -1,
+    AK_ERR_SUCCESS = 0,
+    AK_ERR_UNKNOWN_OP,
+    AK_ERR_NOT_ALLOWED,
+    AK_ERR_MISSING_ARGUMENT,
+    AK_ERR_WRONG_TYPE
+
+} AnankeErrorCode;
+
 struct _s_anankeOpMap {
     AnankeOp operation;
     const char * opstr;
     const size_t oplen;
+};
+
+struct _s_anankeErrorMap {
+    AnankeErrorCode code;
+    const char * msg;
 };
 
 static const struct _s_anankeOpMap OperationMap[] = {
@@ -48,6 +63,15 @@ static const struct _s_anankeOpMap OperationMap[] = {
     {ANANKE_LOCK_RESOURCE, "lock-resource", sizeof("lock-resource")},
     {ANANKE_UNLOCK_RESOURCE, "unlock-resource", sizeof("unlock-resource")},
     {ANANKE_NOP, NULL}
+};
+
+static const struct _s_anankeErrorMap ErrorMap[] = {
+    { AK_ERR_SUCCESS, "Success" },
+    { AK_ERR_UNKNOWN_OP, "Operation unknown" },
+    { AK_ERR_NOT_ALLOWED, "Operation not allowed" },
+    { AK_ERR_MISSING_ARGUMENT, "Argument missing for operation" },
+    { AK_ERR_WRONG_TYPE, "Argument has the wrong type"},
+    { AK_ERR_NONE, NULL }
 };
 
 int ananke_operation (Pair * root, Session * session);

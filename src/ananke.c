@@ -1,12 +1,19 @@
 #include "ananke.h"
 
 /* must be locked before */
-void ananke_error (Message ** stack, const char * message) {
+void ananke_error (Message ** stack, AnankeErrorCode code, char * details) {
     Message * new = NULL;
+    va_list args;
+    int i = 0;
+
+    while (ErrorMap[i].code != AK_ERR_NONE) {
+        if (ErrorMap[i].code == code) { break; }
+        i++;
+    }
 
     new = msg_new();
     if (new == NULL) { return; }
-    if (!msg_printf(new, "{\"operation\": \"error\", \"message\": \"%s\"}", message)) { msg_free(new); return; }
+    if (!msg_printf(new, "{\"operation\": \"error\", \"message\": \"%s\", \"code\": %d, \"details\": \"%s\"}", ErrorMap[i].msg, ErrorMap[i].code, details != NULL ? details : "")) { msg_free(new); return; }
     if(!msg_stack_push(stack, new)) {
         msg_free(new);
     }
@@ -35,7 +42,7 @@ int ananke_operation (Pair * root, Session * session) {
 
     if (opid < 0) {
         if (!mlock(&(session->mout))) { return; }
-        ananke_error(&(session->outstack), "Operation unknown");
+        ananke_error(&(session->outstack), AK_ERR_UNKNOWN_OP, NULL);
         munlock(&(session->mout));
         return 1;
     }
@@ -48,19 +55,19 @@ int ananke_operation (Pair * root, Session * session) {
             return 0;
         case ANANKE_PING:
             if(!mlock(&(session->mout))) { return -1; }
-            ananke_error(&(session->outstack), "It's my job to ping");
+            ananke_error(&(session->outstack), AK_ERR_NOT_ALLOWED, NULL);
             munlock(&(session->mout));
             return 1;
         case ANANKE_PONG:
             if (!pair_get_value_at(root, "count", &vtype, &value, &vlen)) {
                 if (!mlock(&(session->mout))) { return -1; }
-                ananke_error(&(session->outstack), "Missing argument for pong");
+                ananke_error(&(session->outstack), AK_ERR_MISSING_ARGUMENT, "count");
                 munlock(&(session->mout));
                 return 1;
             }
             if (vtype != AK_ENC_INTEGER) {
                 if (!mlock(&(session->mout))) { return -1; }
-                ananke_error(&(session->outstack), "Wrong argument type, count must be int");
+                ananke_error(&(session->outstack), AK_ERR_WRONG_TYPE, "count(integer)");
                 munlock(&(session->mout));
                 return 1;
             }
@@ -71,13 +78,13 @@ int ananke_operation (Pair * root, Session * session) {
         case ANANKE_LOCK_RESOURCE:
             if (!pair_get_value_at(root, "resource", &vtype, &value, &vlen)) {
                 if (!mlock(&(session->mout))) { return -1; }
-                ananke_error(&(session->outstack), "Missing argument for lock-resource");
+                ananke_error(&(session->outstack), AK_ERR_MISSING_ARGUMENT, "resource");
                 munlock(&(session->mout));
                 return 1;
             }
             if (vtype != AK_ENC_STRING) {
                 if (!mlock(&(session->mout))) { return -1; }
-                ananke_error(&(session->outstack), "Resource argument must be string");
+                ananke_error(&(session->outstack), AK_ERR_WRONG_TYPE, "resource(string)");
                 munlock(&(session->mout));
                 return 1;
             }
@@ -91,13 +98,13 @@ int ananke_operation (Pair * root, Session * session) {
         case ANANKE_UNLOCK_RESOURCE:
             if (!pair_get_value_at(root, "lockid", &vtype, &value, &vlen)) {
                 if (!mlock(&(session->mout))) { return -1; }
-                ananke_error(&(session->outstack), "Missing argument for unlock-resource\n");
+                ananke_error(&(session->outstack), AK_ERR_MISSING_ARGUMENT, "lockid");
                 munlock(&(session->mout));
                 return 1;
             }
             if (vtype != AK_ENC_INTEGER) {
                 if (!mlock(&(session->mout))) { return -1; }
-                ananke_error(&(session->outstack), "lockid must be integer\n");
+                ananke_error(&(session->outstack), AK_ERR_WRONG_TYPE, "lockid(integer)");
                 munlock(&(session->mout));
                 return 1;
             }
