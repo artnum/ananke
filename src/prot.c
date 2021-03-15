@@ -460,9 +460,6 @@ Pair * proto_parse (Message * msg) {
         if (tmp == NULL) {
             break;
         }
-        if (tmp->type != AK_ENC_OBJECT) {
-            pair_print(tmp, 0);
-        }
         if (i == 0 && tmp->type != AK_ENC_OBJECT) {
             current = pair_new("", 0, "OBJ", "", 0);
             if (current == NULL) {

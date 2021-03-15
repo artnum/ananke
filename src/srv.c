@@ -54,6 +54,7 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
     Message * msg = NULL;
     char * body = NULL;
     Pair * message = NULL;
+    int pingDiff = 0;
     switch (reason) {
         default: break;
         case LWS_CALLBACK_PROTOCOL_INIT:
@@ -71,47 +72,37 @@ int ananke_protocol (struct lws * wsi, enum lws_callback_reasons reason, void * 
             session->end = 0;
             session->wsi = wsi;
             session->lockCtx = lockCtx;
-            msg = msg_new();
-            if (!msg) {
-                lwsl_err("Cannot allocate message\n");
-                return 1;
-            }
-            if (!msg_printf(msg, "{\"operation\": \"connected\", \"state\": \"OK\"}")) {
-                lwsl_err("Cannot fill message\n");
-                return 1;
-            }
-            if (mlock(&(session->mout))) {
-                msg_stack_push(&(session->outstack), msg);
-                munlock(&(session->mout));
-            }
-            lws_callback_on_writable(wsi);
-            lws_set_timer_usecs(wsi, 5000000);
+            session->errmap = &EnErrorMap;
+
+            ananke_message(session, "{\"operation\": \"connection\", \"state\": true, \"ping-inverval\": %d}", AK_PING_INTERVAL);
+            lws_set_timer_usecs(wsi, AK_PING_INTERVAL);
+
             break;
         /* ping */
         case LWS_CALLBACK_TIMER:
             lwsl_notice("Timer\n");
-            session->pingCount++;
+            if (mlock(&(session->mutex))) {
+                session->pingCount++;
+                pingDiff = session->pingCount - session->pongReceived;
+                munlock(&(session->mutex));
+            } else {
+                lwsl_err("session mutex failed\n");
+            }
             if (session->end) {
                 lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
                 return 1;
             }
-            if (session->pingCount - session->pongReceived > 10) {
+            
+            if (pingDiff > 10) {
                 session->end = 1;
                 lwsl_notice("Client disconnected\n");
                 lws_close_reason(wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, NULL, 0);
                 return 1;
             }
-            msg = msg_new();
-            if (!msg) { lwsl_err("Cannot allocate message\n"); return 1; }
-            if (!msg_printf(msg, "{\"operation\": \"ping\", \"count\": %d}", session->pingCount)) { return 1; }
-            if(mlock(&(session->mout))) {
-                msg_stack_push(&(session->outstack), msg);
-                munlock(&(session->mout));
-            } else {
-                msg_free(msg);
-            }
-            lws_callback_on_writable(wsi);
-            lws_set_timer_usecs(wsi, 5000000);
+
+            ananke_message(session, "{\"operation\": \"ping\", \"count\": %d}", session->pingCount);
+
+            lws_set_timer_usecs(wsi, AK_PING_INTERVAL);
             break;
         case LWS_CALLBACK_CLIENT_CLOSED:
         case LWS_CALLBACK_CLOSED:

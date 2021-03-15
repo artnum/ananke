@@ -37,21 +37,33 @@ int _msg_realloc(Message * msg, size_t addLen) {
     return 1;
 }
 
-int msg_printf(Message * msg, const char * format, ...) {
-    int len = 0;
-    va_list args;
+size_t msg_vprintf(Message * msg, const char * format, va_list ap) {
+    size_t len = 0;
+    va_list ap2;
 
+    va_copy(ap2, ap);
     if (msg == NULL) { return 0; }
     /* pre-flight */
-    va_start(args, format);
-    len = vsnprintf(NULL, 0, format, args) + 1;
+    len = vsnprintf(NULL, 0, format, ap) + 1;
     if (len == 0) { return 0; }
     if (!_msg_realloc(msg, len)) { return 0; }
-    va_start(args, format);
-    if (len != vsnprintf(msg->body + msg->cursor, len, format, args) + 1) { return 0; }
+    if (len != vsnprintf(msg->body + msg->cursor, len, format, ap2) + 1) { return 0; }
     msg->cursor += len;
     msg->nulled = 1;
 
+    return len;    
+}
+
+size_t msg_printf(Message * msg, const char * format, ...) {
+    size_t len = 0;
+    va_list args;
+
+    if (msg == NULL) { return 0; }
+    if (format == NULL) { return 0; }
+
+    va_start(args, format);
+    len = msg_vprintf(msg, format, args);
+    va_end(args);
     return len;
 }
 
