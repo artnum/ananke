@@ -1,4 +1,4 @@
-#include "prot.h"
+#include "include/prot.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

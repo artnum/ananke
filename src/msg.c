@@ -1,5 +1,5 @@
-#include "msg.h"
-#include "mutex.h"
+#include "include/msg.h"
+#include "include/mutex.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

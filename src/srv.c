@@ -1,8 +1,8 @@
-#include "ananke.h"
-#include "lock.h"
-#include "msg.h"
-#include "prot.h"
-#include "mutex.h"
+#include "include/ananke.h"
+#include "include/lock.h"
+#include "include/msg.h"
+#include "include/prot.h"
+#include "include/mutex.h"
 #include <signal.h>
 #include <stdio.h>
 #include <libwebsockets.h>
