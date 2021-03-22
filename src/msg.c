@@ -175,7 +175,8 @@ Message * msgstack_pop (MessageStack * stack, AKStackError * err ) {
         return msg;
     }
     msg = stack->last;
-    msg->previous->next = NULL;
+    if (!msg) { return NULL; }
+    if (msg->previous) { msg->previous->next = NULL; }
     stack->last = msg->previous;
     msg->next = NULL;
     msg->previous = NULL;
